@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📋 Задачи</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #1a1a2e;
+            color: #eee;
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            background: #0f3460;
+            border-radius: 20px;
+            padding: 30px;
+            width: 100%;
+            max-width: 500px;
+        }
+        h1 { text-align: center; color: #e94560; margin-bottom: 20px; }
+        .input-group { display: flex; gap: 10px; margin-bottom: 20px; }
+        #taskInput {
+            flex: 1; padding: 12px; border: none; border-radius: 10px;
+            background: #1a1a2e; color: #eee; font-size: 16px; outline: none;
+        }
+        #addBtn {
+            padding: 12px 20px; border: none; border-radius: 10px;
+            background: #e94560; color: #fff; font-size: 20px; cursor: pointer;
+        }
+        .task {
+            display: flex; align-items: center; gap: 10px;
+            padding: 12px; margin-bottom: 8px; background: #1a1a2e;
+            border-radius: 10px;
+        }
+        .task.done .task-text { text-decoration: line-through; color: #888; }
+        .task-text { flex: 1; }
+        .check-btn {
+            width: 22px; height: 22px; border: 2px solid #e94560;
+            border-radius: 50%; background: transparent; cursor: pointer;
+        }
+        .task.done .check-btn { background: #e94560; }
+        .delete-btn { background: none; border: none; color: #666; font-size: 18px; cursor: pointer; }
+        .stats { text-align: center; margin-top: 20px; color: #888; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📋 Задачи</h1>
+        <div class="input-group">
+            <input type="text" id="taskInput" placeholder="Новая задача...">
+            <button id="addBtn">+</button>
+        </div>
+        <div id="taskList"></div>
+        <div class="stats" id="stats"></div>
+    </div>
+
+    <script>
+        const URL = 'https://pqkjdhurdqvwdckmemnr.supabase.co/rest/v1/tasks';
+        const KEY = 'sb_publishable_ns-p7IgGcignqOUmenT94w_swlwhDl0';
+        const headers = { 'apikey': KEY, 'Authorization': `Bearer ${KEY}`, 'Content-Type': 'application/json' };
+
+        const input = document.getElementById('taskInput');
+        const addBtn = document.getElementById('addBtn');
+        const taskList = document.getElementById('taskList');
+        const stats = document.getElementById('stats');
+
+        let tasks = [];
+
+        async function load() {
+            try {
+                const res = await fetch(`${URL}?order=created_at.asc`, { headers });
+                tasks = await res.json();
+            } catch(e) {}
+            render();
+        }
+
+        function render() {
+            taskList.innerHTML = '';
+            let done = 0;
+            tasks.forEach(t => {
+                if (t.completed) done++;
+                const div = document.createElement('div');
+                div.className = 'task' + (t.completed ? ' done' : '');
+                div.innerHTML = `
+                    <div class="check-btn" data-id="${t.id}"></div>
+                    <span class="task-text">${t.text}</span>
+                    <button class="delete-btn" data-id="${t.id}">✕</button>
+                `;
+                taskList.appendChild(div);
+            });
+            stats.textContent = `${tasks.length} задач · ${done} выполнено`;
+
+            document.querySelectorAll('.check-btn').forEach(b => b.onclick = async () => {
+                const id = b.dataset.id;
+                const cur = tasks.find(t => t.id == id).completed;
+                await fetch(`${URL}?id=eq.${id}`, { method: 'PATCH', headers, body: JSON.stringify({ completed: !cur }) });
+                load();
+            });
+            document.querySelectorAll('.delete-btn').forEach(b => b.onclick = async () => {
+                await fetch(`${URL}?id=eq.${b.dataset.id}`, { method: 'DELETE', headers });
+                load();
+            });
+        }
+
+        async function add() {
+            const text = input.value.trim();
+            if (text) {
+                await fetch(URL, { method: 'POST', headers, body: JSON.stringify({ text, completed: false }) });
+                input.value = '';
+                load();
+            }
+        }
+
+        addBtn.onclick = add;
+        input.onkeydown = e => { if (e.key === 'Enter') add(); };
+        load();
+        setInterval(load, 2000);
+    </script>
+</body>
+</html>
